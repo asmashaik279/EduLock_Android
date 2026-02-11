@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F172A">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:text="📘 Timetable Planner"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp"
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"/>
+
+        <!-- SUBJECT / STUDY NAME -->
+        <EditText
+            android:id="@+id/etSubject"
+            android:hint="Subject / Study name"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#94A3B8"
+            android:backgroundTint="#38BDF8"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- NOTES -->
+        <EditText
+            android:id="@+id/etNotes"
+            android:hint="Notes (optional)"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#94A3B8"
+            android:backgroundTint="#38BDF8"
+            android:minLines="3"
+            android:gravity="top"
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- START TIME -->
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <EditText
+                android:id="@+id/etStartTime"
+                android:hint="Start (HH:MM)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#94A3B8"
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"/>
+
+            <Spinner
+                android:id="@+id/spinnerStartAmPm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+
+        <!-- END TIME -->
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <EditText
+                android:id="@+id/etEndTime"
+                android:hint="End (HH:MM)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#94A3B8"
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"/>
+
+            <Spinner
+                android:id="@+id/spinnerEndAmPm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+
+        <!-- SAVE -->
+        <Button
+            android:id="@+id/btnSave"
+            android:text="Save Timetable"
+            android:textColor="#020617"
+            android:backgroundTint="#38BDF8"
+            android:layout_marginTop="12dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- TABLE -->
+        <HorizontalScrollView
+            android:layout_marginTop="16dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TableLayout
+                android:id="@+id/tableLayout"
+                android:stretchColumns="*"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <TableRow android:background="#1E293B">
+                    <TextView android:text="Subject" android:textColor="#FFFFFF"/>
+                    <TextView android:text="Start" android:textColor="#FFFFFF"/>
+                    <TextView android:text="End" android:textColor="#FFFFFF"/>
+                    <TextView android:text="Delete" android:textColor="#FFFFFF"/>
+                </TableRow>
+
+            </TableLayout>
+        </HorizontalScrollView>
+
+    </LinearLayout>
+</ScrollView>

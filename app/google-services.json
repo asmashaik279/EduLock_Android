@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "266465466452",
+    "project_id": "edulock-45a4f",
+    "storage_bucket": "edulock-45a4f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:266465466452:android:c7441c57c0f52df59775c1",
+        "android_client_info": {
+          "package_name": "com.example.edulock"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5eomSXEl-engmTZF86Zci8lmX4x7hiOw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
