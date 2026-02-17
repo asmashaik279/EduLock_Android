@@ -1,29 +1,42 @@
 package com.example.edulock;
 
+import android.app.TimePickerDialog;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
-import android.view.*;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Calendar;
+import java.util.Locale;
 
 public class PlannerFragment extends Fragment {
 
-    EditText etSubject, etNotes, etStartTime, etEndTime;
-    Spinner spinnerStartAmPm, spinnerEndAmPm;
-    Button btnSave;
-    TableLayout tableLayout;
+    private static final String TAG = "PlannerFragment";
+    private static final String DB_URL = "https://edulock-45a4f-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
-    DatabaseReference plannerRef;
+    private EditText etSubject, etNotes, etStartTime, etEndTime;
+    private Spinner spinnerDay;
+    private Button btnSave;
+    private TableLayout tableLayout;
+    private ProgressBar progressBar;
+
+    private FirebaseAuth auth;
+    private DatabaseReference databaseReference;
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.fragment_planner, container, false);
@@ -32,110 +45,131 @@ public class PlannerFragment extends Fragment {
         etNotes = view.findViewById(R.id.etNotes);
         etStartTime = view.findViewById(R.id.etStartTime);
         etEndTime = view.findViewById(R.id.etEndTime);
-        spinnerStartAmPm = view.findViewById(R.id.spinnerStartAmPm);
-        spinnerEndAmPm = view.findViewById(R.id.spinnerEndAmPm);
+        spinnerDay = view.findViewById(R.id.spinnerDay);
         btnSave = view.findViewById(R.id.btnSave);
         tableLayout = view.findViewById(R.id.tableLayout);
+        progressBar = view.findViewById(R.id.progressBar);
 
-        spinnerStartAmPm.setAdapter(new ArrayAdapter<>(
-                requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"AM", "PM"}));
+        String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+        ArrayAdapter<String> dayAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, days);
+        spinnerDay.setAdapter(dayAdapter);
 
-        spinnerEndAmPm.setAdapter(new ArrayAdapter<>(
-                requireContext(),
-                android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"AM", "PM"}));
+        etStartTime.setOnClickListener(v -> showTimePicker(etStartTime));
+        etEndTime.setOnClickListener(v -> showTimePicker(etEndTime));
 
-        plannerRef = FirebaseDatabase.getInstance()
-                .getReference("planner")
-                .child("test_user_001");
+        auth = FirebaseAuth.getInstance();
+        FirebaseUser user = auth.getCurrentUser();
+        
+        if (user == null) {
+            Toast.makeText(getContext(), "User not logged in!", Toast.LENGTH_SHORT).show();
+            return view;
+        }
 
-        btnSave.setOnClickListener(v -> saveTimetable());
-        loadTimetable();
+        databaseReference = FirebaseDatabase.getInstance(DB_URL).getReference("Timetable").child(user.getUid());
+        btnSave.setOnClickListener(v -> saveData());
+        loadData();
 
         return view;
     }
 
-    private void saveTimetable() {
+    private void showTimePicker(final EditText editText) {
+        Calendar mcurrentTime = Calendar.getInstance();
+        int hour = mcurrentTime.get(Calendar.HOUR_OF_DAY);
+        int minute = mcurrentTime.get(Calendar.MINUTE);
+        new TimePickerDialog(getContext(), (timePicker, selectedHour, selectedMinute) -> {
+            String am_pm = (selectedHour < 12) ? "AM" : "PM";
+            int hourDisplay = (selectedHour > 12) ? selectedHour - 12 : (selectedHour == 0 ? 12 : selectedHour);
+            editText.setText(String.format(Locale.getDefault(), "%02d:%02d %s", hourDisplay, selectedMinute, am_pm));
+        }, hour, minute, false).show();
+    }
 
+    private void saveData() {
         String subject = etSubject.getText().toString().trim();
-        String notes = etNotes.getText().toString().trim();
-        String start = etStartTime.getText().toString().trim()
-                + " " + spinnerStartAmPm.getSelectedItem();
-        String end = etEndTime.getText().toString().trim()
-                + " " + spinnerEndAmPm.getSelectedItem();
+        String day = spinnerDay.getSelectedItem().toString();
+        String startTime = etStartTime.getText().toString().trim();
+        String endTime = etEndTime.getText().toString().trim();
 
-        if (subject.isEmpty() || etStartTime.getText().toString().isEmpty()
-                || etEndTime.getText().toString().isEmpty()) {
-            Toast.makeText(getContext(), "Fill required fields", Toast.LENGTH_SHORT).show();
+        if (TextUtils.isEmpty(subject) || TextUtils.isEmpty(startTime) || TextUtils.isEmpty(endTime)) {
+            Toast.makeText(getContext(), "Fill all required fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String id = plannerRef.push().getKey();
+        progressBar.setVisibility(View.VISIBLE);
+        btnSave.setEnabled(false);
 
-        Map<String, String> map = new HashMap<>();
-        map.put("subject", subject);
-        map.put("notes", notes);
-        map.put("start", start);
-        map.put("end", end);
+        String id = databaseReference.push().getKey();
+        TimetableModel model = new TimetableModel(id, subject, etNotes.getText().toString(), day, startTime, endTime);
 
-        assert id != null;
-        plannerRef.child(id).setValue(map);
-
-        etSubject.setText("");
-        etNotes.setText("");
-        etStartTime.setText("");
-        etEndTime.setText("");
+        databaseReference.child(id).setValue(model)
+                .addOnSuccessListener(unused -> {
+                    progressBar.setVisibility(View.GONE);
+                    btnSave.setEnabled(true);
+                    Toast.makeText(getContext(), "Saved Successfully", Toast.LENGTH_SHORT).show();
+                    clearFields();
+                })
+                .addOnFailureListener(e -> {
+                    progressBar.setVisibility(View.GONE);
+                    btnSave.setEnabled(true);
+                    Toast.makeText(getContext(), "Save Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
-    private void loadTimetable() {
-
-        plannerRef.addValueEventListener(new ValueEventListener() {
+    private void loadData() {
+        databaseReference.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-
-                if (tableLayout.getChildCount() > 1) {
-                    tableLayout.removeViews(1,
-                            tableLayout.getChildCount() - 1);
-                }
-
-                for (DataSnapshot snap : snapshot.getChildren()) {
-
-                    String key = snap.getKey();
-                    String subject = snap.child("subject").getValue(String.class);
-                    String start = snap.child("start").getValue(String.class);
-                    String end = snap.child("end").getValue(String.class);
-
-                    TableRow row = new TableRow(getContext());
-
-                    row.addView(cell(subject));
-                    row.addView(cell(start));
-                    row.addView(cell(end));
-
-                    Button del = new Button(getContext());
-                    del.setText("X");
-                    del.setOnClickListener(v ->
-                    {
-                        assert key != null;
-                        plannerRef.child(key).removeValue();
-                    });
-                    row.addView(del);
-
-                    tableLayout.addView(row);
+                tableLayout.removeAllViews();
+                addHeaderRow();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    TimetableModel model = ds.getValue(TimetableModel.class);
+                    if (model != null) addRow(model);
                 }
             }
-
             @Override
-            public void onCancelled(@NonNull DatabaseError error) { }
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Load failed: " + error.getMessage());
+            }
         });
     }
 
-    private TextView cell(String text) {
+    private void addHeaderRow() {
+        TableRow header = new TableRow(getContext());
+        header.setBackgroundColor(Color.parseColor("#1E293B"));
+        header.addView(createCell("Day", true));
+        header.addView(createCell("Subject", true));
+        header.addView(createCell("Time", true));
+        header.addView(createCell("Action", true));
+        tableLayout.addView(header);
+    }
+
+    private void addRow(TimetableModel model) {
+        TableRow row = new TableRow(getContext());
+        row.addView(createCell(model.getDay(), false));
+        row.addView(createCell(model.getSubject(), false));
+        row.addView(createCell(model.getStartTime() + " - " + model.getEndTime(), false));
+
+        Button btnDelete = new Button(getContext());
+        btnDelete.setText("X");
+        btnDelete.setTextColor(Color.WHITE);
+        btnDelete.setBackgroundColor(Color.RED);
+        btnDelete.setOnClickListener(v -> databaseReference.child(model.getId()).removeValue());
+        
+        TableRow.LayoutParams params = new TableRow.LayoutParams(80, ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnDelete.setLayoutParams(params);
+        row.addView(btnDelete);
+        tableLayout.addView(row);
+    }
+
+    private TextView createCell(String text, boolean isHeader) {
         TextView tv = new TextView(getContext());
         tv.setText(text);
-        tv.setTextColor(0xFFFFFFFF);
-        tv.setPadding(8, 8, 8, 8);
+        tv.setTextColor(Color.WHITE);
+        tv.setPadding(20, 20, 20, 20);
+        if (isHeader) tv.setTypeface(null, Typeface.BOLD);
         return tv;
+    }
+
+    private void clearFields() {
+        etSubject.setText(""); etNotes.setText(""); etStartTime.setText(""); etEndTime.setText("");
     }
 }

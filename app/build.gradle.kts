@@ -1,58 +1,59 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.google.services)
+    id("com.android.application")
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.edulock"
-    compileSdk = 36   // ✅ REQUIRED
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.edulock"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+
+    packaging {
+        resources {
+            excludes += "META-INF/androidx.versionedparcelable_versionedparcelable.version"
+        }
     }
 }
 
 dependencies {
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.activity:activity:1.8.2")
+    implementation("androidx.fragment:fragment:1.6.2")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.multidex:multidex:2.0.1")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // AndroidX
-    implementation(libs.appcompat)
-    implementation(libs.material)
-    implementation(libs.activity)
-    implementation(libs.constraintlayout)
-
-    // Firebase BOM
-    implementation(platform(libs.firebase.bom))
-
-    // Firebase Authentication
-    implementation(libs.firebase.auth)
-
-    // Firebase Realtime Database (Planner)
+    // Firebase (Auth & Database - FREE Tier)
+    implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
+    implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
 
-    // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.ext.junit)
-    androidTestImplementation(libs.espresso.core)
+    
+    // ❌ Removed the problematic PDF library to fix build errors.
+    // We will use Android's native PdfRenderer instead.
 }
