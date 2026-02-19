@@ -1,61 +1,95 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.edulock">
+    package="com.example.edulock"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 🔹 Necessary Permissions for App Blocking 🔹 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Required Permissions -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- This was the missing permission causing the crash -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
         android:label="EduLock"
+        android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.EduLock">
 
-        <!-- 🔹 Splash Screen (Launcher) -->
+        <!-- Splash (Launcher) -->
         <activity
             android:name=".SplashActivity"
-            android:exported="true"
-            android:theme="@style/Theme.EduLock">
+            android:exported="true">
+
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
         </activity>
 
-        <activity android:name=".LoginActivity" android:exported="false" />
-        <activity android:name=".MainActivity" android:exported="false" />
-        <activity android:name=".HomeDashboardActivity" android:exported="false" />
-        <activity android:name=".PDFViewActivity" android:exported="false" />
+        <!-- Login -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false"/>
 
-        <!-- 🔹 Blocked Overlay Screen -->
+        <!-- Main (Welcome Screen) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"/>
+
+        <!-- Home Dashboard -->
+        <activity
+            android:name=".HomeDashboardActivity"
+            android:exported="false"/>
+
+        <!-- Study Mode -->
+        <activity
+            android:name=".StudyModeActivity"
+            android:exported="false"/>
+
+        <!-- Blocked Screen -->
         <activity
             android:name=".BlockedAppActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:noHistory="true"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:exported="false"/>
 
-        <!-- 🔹 Background Service for Monitoring -->
+        <!-- PDF View Activity -->
+        <activity
+            android:name=".PDFViewActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"/>
+
+        <!-- Accessibility Service -->
         <service
-            android:name=".AppBlockService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:name=".AppBlockAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:foregroundServiceType="specialUse">
 
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_config"/>
+        </service>
+
+        <!-- Boot Receiver -->
         <receiver
             android:name=".BootReceiver"
+            android:enabled="true"
             android:exported="true">
+
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
+
         </receiver>
 
     </application>

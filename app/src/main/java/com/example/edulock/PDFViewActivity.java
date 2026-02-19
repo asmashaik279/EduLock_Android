@@ -1,112 +1,153 @@
 package com.example.edulock;
 
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.pdf.PdfRenderer;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 public class PDFViewActivity extends AppCompatActivity {
 
-    private RecyclerView recyclerView;
-    private ImageButton btnBack;
+    private ImageView imageView;
     private TextView tvTitle;
-    private List<Bitmap> pdfPages = new ArrayList<>();
+    private ImageButton btnBack;
+
+    private PdfRenderer pdfRenderer;
+    private PdfRenderer.Page currentPage;
+    private ParcelFileDescriptor fileDescriptor;
+
+    private int currentPageIndex = 0;
+
+    private GestureDetector gestureDetector;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pdf_view);
 
-        recyclerView = findViewById(R.id.pdfRecyclerView);
-        btnBack = findViewById(R.id.btnBack);
+        imageView = findViewById(R.id.pdfImageView);
         tvTitle = findViewById(R.id.tvPdfTitle);
+        btnBack = findViewById(R.id.btnBack);
 
         String fileName = getIntent().getStringExtra("fileName");
         String title = getIntent().getStringExtra("title");
-        
-        tvTitle.setText(title != null ? title : "Reading Book");
+
+        if (title != null) {
+            tvTitle.setText(title.toUpperCase());
+        }
+
         btnBack.setOnClickListener(v -> finish());
 
+        gestureDetector = new GestureDetector(this, new GestureListener());
+
+        imageView.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return true;
+        });
+
         if (fileName != null) {
-            renderPdf(fileName);
-        } else {
-            Toast.makeText(this, "File not found", Toast.LENGTH_SHORT).show();
-            finish();
+            openPdfFromAssets(fileName);
         }
     }
 
-    private void renderPdf(String fileName) {
+    private void openPdfFromAssets(String fileName) {
         try {
             File file = new File(getCacheDir(), fileName);
+
             if (!file.exists()) {
-                InputStream is = getAssets().open(fileName);
-                FileOutputStream os = new FileOutputStream(file);
+                InputStream asset = getAssets().open(fileName);
+                FileOutputStream output = new FileOutputStream(file);
                 byte[] buffer = new byte[1024];
-                int read;
-                while ((read = is.read(buffer)) != -1) os.write(buffer, 0, read);
-                is.close(); os.close();
+                int size;
+                while ((size = asset.read(buffer)) != -1) {
+                    output.write(buffer, 0, size);
+                }
+                asset.close();
+                output.close();
             }
 
-            ParcelFileDescriptor pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
-            PdfRenderer renderer = new PdfRenderer(pfd);
+            fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
+            pdfRenderer = new PdfRenderer(fileDescriptor);
 
-            for (int i = 0; i < renderer.getPageCount(); i++) {
-                PdfRenderer.Page page = renderer.openPage(i);
-                Bitmap bitmap = Bitmap.createBitmap(page.getWidth() * 2, page.getHeight() * 2, Bitmap.Config.ARGB_8888);
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
-                pdfPages.add(bitmap);
-                page.close();
-            }
-            
-            recyclerView.setLayoutManager(new LinearLayoutManager(this));
-            recyclerView.setAdapter(new PdfAdapter(pdfPages));
-            renderer.close();
+            showPage(currentPageIndex);
 
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "Error opening PDF", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private static class PdfAdapter extends RecyclerView.Adapter<PdfAdapter.ViewHolder> {
-        List<Bitmap> pages;
-        PdfAdapter(List<Bitmap> pages) { this.pages = pages; }
+    private void showPage(int index) {
+        if (pdfRenderer == null) return;
+        if (index < 0 || index >= pdfRenderer.getPageCount()) return;
 
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            ImageView imageView = new ImageView(parent.getContext());
-            imageView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            imageView.setAdjustViewBounds(true);
-            imageView.setPadding(0, 0, 0, 20);
-            return new ViewHolder(imageView);
+        if (currentPage != null) {
+            currentPage.close();
         }
 
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            ((ImageView) holder.itemView).setImageBitmap(pages.get(position));
-        }
+        currentPageIndex = index;
+        currentPage = pdfRenderer.openPage(currentPageIndex);
+
+        Bitmap bitmap = Bitmap.createBitmap(
+                currentPage.getWidth(),
+                currentPage.getHeight(),
+                Bitmap.Config.ARGB_8888
+        );
+
+        bitmap.eraseColor(Color.WHITE);
+
+        currentPage.render(bitmap, null, null,
+                PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+
+        imageView.setImageBitmap(bitmap);
+    }
+
+    private class GestureListener extends GestureDetector.SimpleOnGestureListener {
+
+        private static final int SWIPE_THRESHOLD = 100;
+        private static final int SWIPE_VELOCITY_THRESHOLD = 100;
 
         @Override
-        public int getItemCount() { return pages.size(); }
-        static class ViewHolder extends RecyclerView.ViewHolder { ViewHolder(View v) { super(v); } }
+        public boolean onFling(MotionEvent e1, MotionEvent e2,
+                               float velocityX, float velocityY) {
+
+            float diffX = e2.getX() - e1.getX();
+
+            if (Math.abs(diffX) > SWIPE_THRESHOLD &&
+                    Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+
+                if (diffX > 0) {
+                    // Swipe Right → Previous Page
+                    showPage(currentPageIndex - 1);
+                } else {
+                    // Swipe Left → Next Page
+                    showPage(currentPageIndex + 1);
+                }
+                return true;
+            }
+            return false;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            if (currentPage != null) currentPage.close();
+            if (pdfRenderer != null) pdfRenderer.close();
+            if (fileDescriptor != null) fileDescriptor.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        super.onDestroy();
     }
 }

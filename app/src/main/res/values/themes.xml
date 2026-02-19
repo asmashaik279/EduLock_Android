@@ -2,8 +2,22 @@
     <!-- Base application theme. -->
     <style name="Base.Theme.EduLock" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">#38BDF8</item>
+        <item name="android:windowBackground">#0F172A</item>
     </style>
 
     <style name="Theme.EduLock" parent="Base.Theme.EduLock" />
+
+    <style name="FocusSwitch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="android:thumbTint">#38BDF8</item>
+        <item name="android:trackTint">#334155</item>
+    </style>
+
+    <style name="NumberPickerTheme" parent="Theme.AppCompat.Light">
+        <item name="android:editTextColor">#FFFFFF</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:colorControlNormal">#38BDF8</item>
+    </style>
+
+    <style name="Theme.EduLock.NumberPicker" parent="NumberPickerTheme" />
 </resources>

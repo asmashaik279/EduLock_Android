@@ -52,7 +52,8 @@ public class ProgressFragment extends Fragment {
     }
 
     private void displayStreak() {
-        int streak = prefs.getInt("study_streak", 5); // Default to 5 for demo if not set
+        // Use 0 as default to show actual progress
+        int streak = prefs.getInt("study_streak", 0);
         tvStreak.setText("🔥 " + streak + " Days");
     }
 

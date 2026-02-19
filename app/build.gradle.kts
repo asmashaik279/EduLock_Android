@@ -30,15 +30,10 @@ android {
     buildFeatures {
         viewBinding = true
     }
-
-    packaging {
-        resources {
-            excludes += "META-INF/androidx.versionedparcelable_versionedparcelable.version"
-        }
-    }
 }
 
 dependencies {
+
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.activity:activity:1.8.2")
@@ -47,13 +42,9 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // Firebase (Auth & Database - FREE Tier)
+    // Firebase (Official Google Repository)
     implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
 
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-    
-    // ❌ Removed the problematic PDF library to fix build errors.
-    // We will use Android's native PdfRenderer instead.
 }
