@@ -1,11 +1,13 @@
 package com.example.edulock;
 
+import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -100,24 +102,27 @@ public class PlannerFragment extends Fragment {
         String id = databaseReference.push().getKey();
         TimetableModel model = new TimetableModel(id, subject, etNotes.getText().toString(), day, startTime, endTime);
 
-        databaseReference.child(id).setValue(model)
-                .addOnSuccessListener(unused -> {
-                    progressBar.setVisibility(View.GONE);
-                    btnSave.setEnabled(true);
-                    Toast.makeText(getContext(), "Saved Successfully", Toast.LENGTH_SHORT).show();
-                    clearFields();
-                })
-                .addOnFailureListener(e -> {
-                    progressBar.setVisibility(View.GONE);
-                    btnSave.setEnabled(true);
-                    Toast.makeText(getContext(), "Save Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
+        if (id != null) {
+            databaseReference.child(id).setValue(model)
+                    .addOnSuccessListener(unused -> {
+                        progressBar.setVisibility(View.GONE);
+                        btnSave.setEnabled(true);
+                        Toast.makeText(getContext(), "Saved Successfully", Toast.LENGTH_SHORT).show();
+                        clearFields();
+                    })
+                    .addOnFailureListener(e -> {
+                        progressBar.setVisibility(View.GONE);
+                        btnSave.setEnabled(true);
+                        Toast.makeText(getContext(), "Save Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
+        }
     }
 
     private void loadData() {
         databaseReference.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!isAdded()) return;
                 tableLayout.removeAllViews();
                 addHeaderRow();
                 for (DataSnapshot ds : snapshot.getChildren()) {
@@ -138,34 +143,59 @@ public class PlannerFragment extends Fragment {
         header.addView(createCell("Day", true));
         header.addView(createCell("Subject", true));
         header.addView(createCell("Time", true));
-        header.addView(createCell("Action", true));
+        header.addView(createCell("Del", true));
         tableLayout.addView(header);
     }
 
     private void addRow(TimetableModel model) {
         TableRow row = new TableRow(getContext());
+        row.setPadding(0, 10, 0, 10);
         row.addView(createCell(model.getDay(), false));
         row.addView(createCell(model.getSubject(), false));
-        row.addView(createCell(model.getStartTime() + " - " + model.getEndTime(), false));
+        row.addView(createCell(model.getStartTime() + "\n" + model.getEndTime(), false));
 
-        Button btnDelete = new Button(getContext());
-        btnDelete.setText("X");
-        btnDelete.setTextColor(Color.WHITE);
-        btnDelete.setBackgroundColor(Color.RED);
-        btnDelete.setOnClickListener(v -> databaseReference.child(model.getId()).removeValue());
+        ImageView ivDelete = new ImageView(getContext());
+        ivDelete.setImageResource(android.R.drawable.ic_delete);
+        ivDelete.setColorFilter(Color.RED);
+        ivDelete.setPadding(10, 10, 10, 10);
         
-        TableRow.LayoutParams params = new TableRow.LayoutParams(80, ViewGroup.LayoutParams.WRAP_CONTENT);
-        btnDelete.setLayoutParams(params);
-        row.addView(btnDelete);
+        TableRow.LayoutParams params = new TableRow.LayoutParams(60, 60);
+        params.gravity = Gravity.CENTER;
+        ivDelete.setLayoutParams(params);
+
+        ivDelete.setOnClickListener(v -> {
+            new AlertDialog.Builder(getContext())
+                .setTitle("Delete Task")
+                .setMessage("Are you sure you want to delete this?")
+                .setPositiveButton("Yes", (dialog, which) -> {
+                    databaseReference.child(model.getId()).removeValue();
+                })
+                .setNegativeButton("No", null)
+                .show();
+        });
+        
+        row.addView(ivDelete);
         tableLayout.addView(row);
+
+        // Add a separator line
+        View separator = new View(getContext());
+        separator.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT, 1));
+        separator.setBackgroundColor(Color.parseColor("#334155"));
+        tableLayout.addView(separator);
     }
 
     private TextView createCell(String text, boolean isHeader) {
         TextView tv = new TextView(getContext());
         tv.setText(text);
         tv.setTextColor(Color.WHITE);
-        tv.setPadding(20, 20, 20, 20);
-        if (isHeader) tv.setTypeface(null, Typeface.BOLD);
+        tv.setPadding(10, 20, 10, 20);
+        tv.setGravity(Gravity.CENTER);
+        if (isHeader) {
+            tv.setTypeface(null, Typeface.BOLD);
+            tv.setTextSize(14);
+        } else {
+            tv.setTextSize(12);
+        }
         return tv;
     }
 

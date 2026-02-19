@@ -18,17 +18,15 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Robust Accessibility Service for app blocking.
- * Optimized for blocking default and manually selected apps while ensuring
- * the app itself is never blocked.
+ * Enhanced Accessibility Service for app blocking.
+ * Specifically optimized to prevent self-blocking when accessed from Recents.
  */
 public class AppBlockAccessibilityService extends AccessibilityService {
 
     private static final String TAG = "EduLockBlocker";
-    private static final String CHANNEL_ID = "EduLock_Focus_Service_Channel";
+    private static final String CHANNEL_ID = "EduLock_Focus_Status_Channel";
     private static final int NOTIFICATION_ID = 101;
 
-    // Default apps that are always blocked in Focus Mode
     private static final Set<String> DEFAULT_BLOCKED_PACKAGES = new HashSet<>(Arrays.asList(
             "com.instagram.android",
             "com.snapchat.android",
@@ -41,20 +39,13 @@ public class AppBlockAccessibilityService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
-        Log.d(TAG, "Accessibility Service connected");
         createNotificationChannel();
         checkAndToggleForeground();
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event == null) return;
-
-        // Ensure service is in foreground if Focus Mode is active
-        checkAndToggleForeground();
-
-        // Listen for app window changes
-        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        if (event == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             return;
         }
 
@@ -64,14 +55,18 @@ public class AppBlockAccessibilityService extends AccessibilityService {
         String currentApp = pkgName.toString();
         String myPackage = getPackageName();
 
-        // 1. CRITICAL: Never block EduLock or essential system components
-        if (currentApp.equals(myPackage) || 
-            currentApp.equals("android") || 
+        // 1. ABSOLUTE EXCLUSION: Never process events from our own app
+        if (currentApp.equals(myPackage)) {
+            return;
+        }
+
+        // 2. SYSTEM EXCLUSION: Ignore launcher, system UI, and common MIUI components
+        if (currentApp.equals("android") || 
             currentApp.contains("launcher") || 
             currentApp.contains("systemui") ||
             currentApp.contains("settings") ||
-            currentApp.contains("packageinstaller") ||
-            currentApp.contains("permissioncontroller")) {
+            currentApp.contains("miui.home") ||
+            currentApp.contains("miui.recents")) {
             return;
         }
 
@@ -79,6 +74,7 @@ public class AppBlockAccessibilityService extends AccessibilityService {
         boolean isActive = prefs.getBoolean("isStudyModeActive", false);
 
         if (!isActive) {
+            if (isForeground) checkAndToggleForeground();
             return;
         }
 
@@ -89,21 +85,21 @@ public class AppBlockAccessibilityService extends AccessibilityService {
             return;
         }
 
-        // 2. Retrieve user-selected blocked apps
+        // Ensure persistent notification is shown
+        checkAndToggleForeground();
+
         Set<String> manuallyBlocked = prefs.getStringSet("userBlockedApps", new HashSet<>());
 
-        // 3. Block if the app is in the default list OR the manual list
+        // 3. BLOCKING LOGIC: Check both default and manual lists
         if (DEFAULT_BLOCKED_PACKAGES.contains(currentApp) || manuallyBlocked.contains(currentApp)) {
-            Log.d(TAG, "Blocking restricted app: " + currentApp);
+            Log.d(TAG, "Restricting app: " + currentApp);
             
-            // Redirect to home screen
+            // Step A: Minimize the blocked app
             performGlobalAction(GLOBAL_ACTION_HOME);
             
-            // Show the custom Blocked screen
+            // Step B: Redirect to blocked info screen
             Intent intent = new Intent(this, BlockedAppActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | 
-                          Intent.FLAG_ACTIVITY_CLEAR_TASK | 
-                          Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
         }
     }
@@ -123,12 +119,11 @@ public class AppBlockAccessibilityService extends AccessibilityService {
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Focus Mode is Active")
-                .setContentText("Your selected apps are currently locked.")
+                .setContentTitle("Focus Mode Active")
+                .setContentText("Distracting apps are currently locked.")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
-                .setCategory(Notification.CATEGORY_SERVICE)
                 .build();
     }
 
@@ -136,13 +131,11 @@ public class AppBlockAccessibilityService extends AccessibilityService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "EduLock Focus Status",
+                    "Focus Mode Status",
                     NotificationManager.IMPORTANCE_LOW
             );
             NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
+            if (manager != null) manager.createNotificationChannel(channel);
         }
     }
 
