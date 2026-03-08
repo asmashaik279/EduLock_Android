@@ -18,8 +18,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Enhanced Accessibility Service for app blocking.
- * Specifically optimized to prevent self-blocking when accessed from Recents.
+ * Robust Accessibility Service for app blocking.
+ * Guaranteed to never block itself and remain active even if the app is removed from recents.
  */
 public class AppBlockAccessibilityService extends AccessibilityService {
 
@@ -44,8 +44,16 @@ public class AppBlockAccessibilityService extends AccessibilityService {
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return START_STICKY;
+    }
+
+    @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        if (event == null) return;
+
+        // Listen for app window state changes (most reliable for app switching)
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             return;
         }
 
@@ -55,18 +63,19 @@ public class AppBlockAccessibilityService extends AccessibilityService {
         String currentApp = pkgName.toString();
         String myPackage = getPackageName();
 
-        // 1. ABSOLUTE EXCLUSION: Never process events from our own app
-        if (currentApp.equals(myPackage)) {
+        // 1. CRITICAL: Absolute exclusion for our own app to prevent self-blocking
+        // We use equalsIgnoreCase and check this first thing.
+        if (currentApp.equalsIgnoreCase(myPackage)) {
+            Log.d(TAG, "Excluding our own app from blocking.");
             return;
         }
 
-        // 2. SYSTEM EXCLUSION: Ignore launcher, system UI, and common MIUI components
+        // 2. Ignore all system, launcher and MIUI transition components
         if (currentApp.equals("android") || 
             currentApp.contains("launcher") || 
             currentApp.contains("systemui") ||
             currentApp.contains("settings") ||
-            currentApp.contains("miui.home") ||
-            currentApp.contains("miui.recents")) {
+            currentApp.contains("miui")) {
             return;
         }
 
@@ -85,19 +94,18 @@ public class AppBlockAccessibilityService extends AccessibilityService {
             return;
         }
 
-        // Ensure persistent notification is shown
+        // Ensure service stays in foreground while Focus Mode is active
         checkAndToggleForeground();
 
         Set<String> manuallyBlocked = prefs.getStringSet("userBlockedApps", new HashSet<>());
 
-        // 3. BLOCKING LOGIC: Check both default and manual lists
+        // 3. Blocking logic for default and user-selected apps
         if (DEFAULT_BLOCKED_PACKAGES.contains(currentApp) || manuallyBlocked.contains(currentApp)) {
-            Log.d(TAG, "Restricting app: " + currentApp);
+            Log.d(TAG, "Blocking access to restricted app: " + currentApp);
             
-            // Step A: Minimize the blocked app
+            // Minimize the app and redirect to info screen
             performGlobalAction(GLOBAL_ACTION_HOME);
             
-            // Step B: Redirect to blocked info screen
             Intent intent = new Intent(this, BlockedAppActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
@@ -119,11 +127,12 @@ public class AppBlockAccessibilityService extends AccessibilityService {
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Focus Mode Active")
-                .setContentText("Distracting apps are currently locked.")
+                .setContentTitle("Focus Mode is Active")
+                .setContentText("Your selected apps are currently locked.")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
                 .build();
     }
 
@@ -131,7 +140,7 @@ public class AppBlockAccessibilityService extends AccessibilityService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Focus Mode Status",
+                    "EduLock Focus Status",
                     NotificationManager.IMPORTANCE_LOW
             );
             NotificationManager manager = getSystemService(NotificationManager.class);

@@ -96,15 +96,19 @@ public class StudyModeFragment extends Fragment {
             databaseRef = FirebaseDatabase.getInstance(DB_URL).getReference("users").child(userId).child("blockedApps");
         }
 
+        setupTimer(); // Load saved duration first
         setupRecyclerViews();
-        setupTimer();
         fetchBlockedAppsFromFirebase(); // Initial load
         
         setupListeners();
 
         boolean isActive = prefs.getBoolean("isStudyModeActive", false);
         switchFocus.setChecked(isActive);
-        if (isActive) lockUI();
+        if (isActive) {
+            lockUI();
+            int duration = prefs.getInt("focusDuration", 30);
+            tvStudyModeInfo.setText("Focus Mode ACTIVE for " + duration + " minutes.");
+        }
     }
 
     private void setupRecyclerViews() {
@@ -267,9 +271,19 @@ public class StudyModeFragment extends Fragment {
                     switchFocus.setChecked(false);
                     return;
                 }
-                long endTime = System.currentTimeMillis() + (numberPicker.getValue() * 60 * 1000L);
-                prefs.edit().putBoolean("isStudyModeActive", true).putLong("studyModeEndTime", endTime).apply();
+                
+                int minutes = numberPicker.getValue();
+                long endTime = System.currentTimeMillis() + (minutes * 60 * 1000L);
+                
+                prefs.edit()
+                        .putBoolean("isStudyModeActive", true)
+                        .putInt("focusDuration", minutes) // Save current duration
+                        .putLong("studyModeEndTime", endTime)
+                        .apply();
+                
                 lockUI();
+                tvStudyModeInfo.setText("Focus Mode ACTIVE for " + minutes + " minutes.");
+                Toast.makeText(context, "Blocking started for " + minutes + " mins", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -281,8 +295,11 @@ public class StudyModeFragment extends Fragment {
     }
 
     private void setupTimer() {
-        numberPicker.setMinValue(1);
-        numberPicker.setMaxValue(180);
-        numberPicker.setValue(30);
+        numberPicker.setMinValue(30);
+        numberPicker.setMaxValue(480); // 8 hours
+        
+        // Restore the last set duration, default to 30
+        int lastDuration = prefs.getInt("focusDuration", 30);
+        numberPicker.setValue(lastDuration);
     }
 }

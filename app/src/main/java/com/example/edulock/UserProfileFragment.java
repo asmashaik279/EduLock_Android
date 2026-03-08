@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -41,6 +42,7 @@ public class UserProfileFragment extends Fragment {
 
     private FirebaseAuth auth;
     private DatabaseReference databaseRef;
+    private SharedPreferences eduPrefs;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -63,6 +65,14 @@ public class UserProfileFragment extends Fragment {
         btnSaveProfile = view.findViewById(R.id.btnSaveProfile);
         btnLogout = view.findViewById(R.id.btnLogout);
 
+        // Make fields non-editable by default
+        disableAllEdits();
+
+        Context context = getContext();
+        if (context != null) {
+            eduPrefs = context.getSharedPreferences("EduLockPrefs", Context.MODE_PRIVATE);
+        }
+
         auth = FirebaseAuth.getInstance();
         FirebaseUser user = auth.getCurrentUser();
 
@@ -74,11 +84,17 @@ public class UserProfileFragment extends Fragment {
         databaseRef = FirebaseDatabase.getInstance(DB_URL).getReference("users").child(user.getUid());
 
         setupDatePicker();
+        setupClickToEdit();
         loadProfile();
 
         btnSaveProfile.setOnClickListener(v -> saveOrUpdateProfile());
         
         btnLogout.setOnClickListener(v -> {
+            if (eduPrefs != null && eduPrefs.getBoolean("isStudyModeActive", false)) {
+                Toast.makeText(getContext(), "Cannot logout while Focus Mode is active!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             auth.signOut();
             if (getActivity() != null) {
                 Intent intent = new Intent(getActivity(), LoginActivity.class);
@@ -90,6 +106,34 @@ public class UserProfileFragment extends Fragment {
 
         // Show MIUI helper dialog if needed
         checkAndShowMiuiHelper();
+    }
+
+    private void disableAllEdits() {
+        etName.setFocusable(false);
+        etMobile.setFocusable(false);
+        etEmail.setFocusable(false);
+        etAddress.setFocusable(false);
+        // etDob is already focusable=false because it uses a picker
+    }
+
+    private void setupClickToEdit() {
+        View.OnClickListener clickListener = v -> {
+            TextInputEditText et = (TextInputEditText) v;
+            et.setFocusableInTouchMode(true);
+            et.setFocusable(true);
+            et.requestFocus();
+            
+            // Show keyboard
+            InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(et, InputMethodManager.SHOW_IMPLICIT);
+            }
+        };
+
+        etName.setOnClickListener(clickListener);
+        etMobile.setOnClickListener(clickListener);
+        etEmail.setOnClickListener(clickListener);
+        etAddress.setOnClickListener(clickListener);
     }
 
     private void setupDatePicker() {
@@ -137,6 +181,13 @@ public class UserProfileFragment extends Fragment {
             return;
         }
 
+        // Hide keyboard before saving
+        View view = getActivity() != null ? getActivity().getCurrentFocus() : null;
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+
         Map<String, Object> data = new HashMap<>();
         data.put("name", name);
         data.put("mobile", etMobile.getText().toString().trim());
@@ -149,6 +200,7 @@ public class UserProfileFragment extends Fragment {
                     if(isAdded()) {
                         Toast.makeText(getContext(), "Profile updated successfully", Toast.LENGTH_SHORT).show();
                         tvProfileName.setText(name);
+                        disableAllEdits(); // Lock fields again
                     }
                 })
                 .addOnFailureListener(e -> {
@@ -167,7 +219,6 @@ public class UserProfileFragment extends Fragment {
                 .setTitle("Xiaomi Device Detected")
                 .setMessage("To ensure EduLock works correctly, please enable \"Autostart\" and set \"Battery saver\" to \"No restrictions\" for EduLock in your phone's Settings or Security app.")
                 .setPositiveButton("Got it", (dialog, which) -> {
-                    // Try to open autostart settings, this might not work on all MIUI versions
                     try {
                         Intent intent = new Intent();
                         intent.setComponent(new ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
